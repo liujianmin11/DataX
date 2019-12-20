@@ -77,6 +77,13 @@ public class KeyConstant {
      * MongoDB的_id
      */
     public static final String MONGO_PRIMARY_ID = "_id";
+
+
+    public static final String MONGO_TIMESTAMP_FIELD = "timestampField";
+    public static final String MONGO_TIMESTAMP_FILTER_STARTTIME = "startTime";
+    public static final String MONGO_TIMESTAMP_FILTER_ENDTIME = "endTime";
+
+
     /**
      * MongoDB的错误码
      */

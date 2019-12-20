@@ -30,6 +30,8 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
 import org.bson.Document;
 import org.bson.types.ObjectId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Created by jianying.wcj on 2015/3/19 0019.
@@ -72,7 +74,6 @@ public class MongoDBReader extends Reader {
         }
     }
 
-
     public static class Task extends Reader.Task {
 
         private Configuration readerSliceConfig;
@@ -91,6 +92,7 @@ public class MongoDBReader extends Reader {
         private JSONArray mongodbColumnMeta = null;
         private Object lowerBound = null;
         private Object upperBound = null;
+        private String timestampField = null;
         private boolean isObjectId = true;
 
         @Override
@@ -107,19 +109,25 @@ public class MongoDBReader extends Reader {
 
             MongoCursor<Document> dbCursor = null;
             Document filter = new Document();
-            if (lowerBound.equals("min")) {
-                if (!upperBound.equals("max")) {
-                    filter.append(KeyConstant.MONGO_PRIMARY_ID, new Document("$lt", isObjectId ? new ObjectId(upperBound.toString()) : upperBound));
+            if(!Strings.isNullOrEmpty(this.timestampField)){
+                filter.append(this.timestampField, new Document("$gte",new Date((Long)lowerBound)).append("$lt",new Date((Long)upperBound)));
+            }else {
+                if (lowerBound.equals("min")) {
+                    if (!upperBound.equals("max")) {
+                        filter.append(KeyConstant.MONGO_PRIMARY_ID, new Document("$lt", isObjectId ? new ObjectId(upperBound.toString()) : upperBound));
+                    }
+                } else if (upperBound.equals("max")) {
+                    filter.append(KeyConstant.MONGO_PRIMARY_ID, new Document("$gte", isObjectId ? new ObjectId(lowerBound.toString()) : lowerBound));
+                } else {
+                    filter.append(KeyConstant.MONGO_PRIMARY_ID, new Document("$gte", isObjectId ? new ObjectId(lowerBound.toString()) : lowerBound).append("$lt", isObjectId ? new ObjectId(upperBound.toString()) : upperBound));
                 }
-            } else if (upperBound.equals("max")) {
-                filter.append(KeyConstant.MONGO_PRIMARY_ID, new Document("$gte", isObjectId ? new ObjectId(lowerBound.toString()) : lowerBound));
-            } else {
-                filter.append(KeyConstant.MONGO_PRIMARY_ID, new Document("$gte", isObjectId ? new ObjectId(lowerBound.toString()) : lowerBound).append("$lt", isObjectId ? new ObjectId(upperBound.toString()) : upperBound));
             }
+
             if(!Strings.isNullOrEmpty(query)) {
                 Document queryFilter = Document.parse(query);
                 filter = new Document("$and", Arrays.asList(filter, queryFilter));
             }
+
             dbCursor = col.find(filter).iterator();
             while (dbCursor.hasNext()) {
                 Document item = dbCursor.next();
@@ -201,6 +209,7 @@ public class MongoDBReader extends Reader {
             this.lowerBound = readerSliceConfig.get(KeyConstant.LOWER_BOUND);
             this.upperBound = readerSliceConfig.get(KeyConstant.UPPER_BOUND);
             this.isObjectId = readerSliceConfig.getBool(KeyConstant.IS_OBJECTID);
+            this.timestampField = readerSliceConfig.getString(KeyConstant.MONGO_TIMESTAMP_FIELD);
         }
 
         @Override

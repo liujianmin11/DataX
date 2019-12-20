@@ -37,10 +37,18 @@ public class CollectionSplitUtil {
                 MongoDBReaderErrorCode.ILLEGAL_VALUE.getDescription());
         }
 
+        String timestampField = originalSliceConfig.getString(KeyConstant.MONGO_TIMESTAMP_FIELD);
+        List<Range> rangeList;
         boolean isObjectId = isPrimaryIdObjectId(mongoClient, dbName, collName);
+        if(!Strings.isNullOrEmpty(timestampField)){
+            long startTime=originalSliceConfig.getLong(KeyConstant.MONGO_TIMESTAMP_FILTER_STARTTIME);
+            long endTime=originalSliceConfig.getLong(KeyConstant.MONGO_TIMESTAMP_FILTER_ENDTIME);
+            rangeList=doSplitCollection(adviceNumber,startTime,endTime);
+        }else {
+            rangeList = doSplitCollection(adviceNumber, mongoClient, dbName, collName, isObjectId);
+        }
 
-        List<Range> rangeList = doSplitCollection(adviceNumber, mongoClient, dbName, collName, isObjectId);
-        for(Range range : rangeList) {
+        for (Range range : rangeList) {
             Configuration conf = originalSliceConfig.clone();
             conf.set(KeyConstant.LOWER_BOUND, range.lowerBound);
             conf.set(KeyConstant.UPPER_BOUND, range.upperBound);
@@ -50,6 +58,25 @@ public class CollectionSplitUtil {
         return confList;
     }
 
+    // split the collection into multiple chunks, each chunk specifies a range
+    private static List<Range> doSplitCollection(int adviceNumber,long startTime,long endTime) {
+
+        List<Range> rangeList = new ArrayList<Range>();
+        int splitPointCount = adviceNumber - 1;
+        long slot=(endTime-startTime)/adviceNumber;
+        for (int i = 0; i < splitPointCount; i++) {
+            Range range = new Range();
+            range.lowerBound = startTime;
+            startTime=startTime+slot;
+            range.upperBound = startTime;
+            rangeList.add(range);
+        }
+        Range range = new Range();
+        range.lowerBound = startTime;
+        range.upperBound = endTime+1;
+        rangeList.add(range);
+        return rangeList;
+    }
 
     private static boolean isPrimaryIdObjectId(MongoClient mongoClient, String dbName, String collName) {
         MongoDatabase database = mongoClient.getDatabase(dbName);
